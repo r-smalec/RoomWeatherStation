@@ -31,11 +31,13 @@
 #include <SPIMemory.h>
 #include <SPI.h>
 
+#define SERIAL_DBG 1
+
 #define ENS_SCK 13
 #define ENS_MISO 12
 #define ENS_MOSI 11
-#define ENS_CS 10
-//DFRobot_ENS160_SPI ens(&SPI, ENS_CS);
+#define ENS_CS 9
+DFRobot_ENS160_I2C ens(&Wire, 0x53);
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -62,7 +64,9 @@ void setup() {
     while(!Serial);    // time to get serial running
         // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
     if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-    Serial.println(F("SSD1306 allocation failed"));
+    #ifdef SERIAL_DBG    
+        Serial.println(F("SSD1306 allocation failed"));
+    #endif
     for(;;); // Don't proceed, loop forever
     }
     // Show initial display buffer contents on the screen --
@@ -81,40 +85,53 @@ void setup() {
     uint8_t timeoutNo = 3;
 
     if (!bme.begin(0x76, &Wire)) {
-        Serial.println("Could not find a valid BME280 sensor, check wiring, address, sensor ID!");
-        Serial.print("SensorID was: 0x"); Serial.println(bme.sensorID(),16);
+        #ifdef SERIAL_DGB
+            Serial.println("Could not find a valid BME280 sensor, check wiring, address, sensor ID!");
+            Serial.print("SensorID was: 0x"); Serial.println(bme.sensorID(),16);
+        #endif
         while (timeoutNo--) delay(10);
     }
 
     timeoutNo = 3;
 
-    // if(ens.begin() != NO_ERR) {
-    //     Serial.println("Communication with ENS160 failed, chcek connections and power");
-    //     while (timeoutNo--) delay(10);
-    // }
+    if(ens.begin() != NO_ERR) {
+        #ifdef SERIAL_DGB
+            Serial.println("Communication with ENS160 failed, chcek connections and power");
+        #endif
+        while (timeoutNo--) delay(10);
+    }
 
-    // String bmeStat(bme.sensorID(), DEC);
-    // String ensStat(ens.getENS160Status(), DEC);
-    // Serial.println("BME status: " + bmeStat + " ENS status " + ensStat + ".");
-    
-    // ens.setPWRMode(ENS160_STANDARD_MODE);
-    // ens.setTempAndHum(bme.readTemperature(), bme.readHumidity());
-    
-
-    delayTime = 500;
-
-    Serial.println();
+    String bmeStat(bme.sensorID(), DEC);
+    String ensStat(ens.getENS160Status(), DEC);
+    #ifdef SERIAL_DBG
+        Serial.println("BME status: " + bmeStat + " ENS status " + ensStat + ".");
+    #endif
+    ens.setPWRMode(ENS160_STANDARD_MODE);
+    ens.setTempAndHum(bme.readTemperature(), bme.readHumidity());
     
     digitalWrite(MEM_CS, LOW);
-    uint16_t manufacturerID = 0x0000;
-    SPI.transfer(0x90);
-    SPI.transfer(0x00);
-    SPI.transfer(0x00);
-    manufacturerID = SPI.transfer(0x00);
+    uint8_t manufacturerID = 0x00;
+    uint8_t memType = 0x00;
+    uint8_t memCap = 0x00;
+    SPI.transfer(0x9F);
+    manufacturerID = SPI.transfer(0x55);
+    memType = SPI.transfer(0x55);
+    memCap = SPI.transfer(55);
     digitalWrite(MEM_CS, HIGH);
-    String manufacturerIDstr = String(manufacturerID, HEX);
-    Serial.print("Manufacturer ID: ");
-    Serial.println(manufacturerIDstr);
+    #ifdef SERIAL_DBG
+        String manufacturerID_str = String(manufacturerID, HEX);
+        String memType_str = String(memType, HEX);
+        String memCap_str = String(memCap, HEX);
+        Serial.print("Manufacturer ID: ");
+        Serial.println(manufacturerID_str);
+        Serial.print("Memory type: ");
+        Serial.println(memType_str);
+        Serial.print("Memory capacity: ");
+        Serial.println(memCap_str);
+    #endif
+
+    delayTime = 500;
+    Serial.println();
 }
 
 
@@ -122,41 +139,11 @@ void loop() {
 
     printValues();
     delay(delayTime);
-    // for(uint8_t memAddr = 0x01; memAddr < 0xFF; memAddr++) {
-    //     digitalWrite(MEM_CS, LOW);
-    //     uint8_t memData = 0x69;
-    //     SPI.transfer(0x03);
-    //     SPI.transfer(0x00);
-    //     SPI.transfer(0x00);
-    //     memData = SPI.transfer(memAddr);
-    //     Serial.print(memAddr);
-    //     Serial.print(": ");
-    //     Serial.println(memData);
-    //     digitalWrite(MEM_CS, HIGH);
-    // }
-
-    digitalWrite(MEM_CS, LOW);
-    uint8_t manufacturerID = 0x0000;
-    uint8_t deviceID = 0x0000;
-    SPI.transfer(0x90);
-    SPI.transfer(0x00);
-    SPI.transfer(0x00);
-    SPI.transfer(0x00);
-    manufacturerID = SPI.transfer(0x55);
-    deviceID = SPI.transfer(0x55);
-    delay(1);
-    digitalWrite(MEM_CS, HIGH);
-    String manufacturerID_str = String(manufacturerID, HEX);
-    String deviceID_str = String(deviceID, HEX);
-    Serial.print("Manufacturer ID: ");
-    Serial.println(manufacturerID_str);
-    Serial.print("Device ID: ");
-    Serial.println(deviceID_str);
 }
 
 template <class T> void printLine(String txt, T val) {
 
-    const int16_t curX = 90;
+    const int16_t curX = 85;
 
     display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
     display.print(txt);
@@ -164,21 +151,30 @@ template <class T> void printLine(String txt, T val) {
     display.fillRect(curX, display.getCursorY(), 50, 8, SSD1306_BLACK);
     display.setCursor(curX, display.getCursorY());
     display.println(val);
+
+    #ifdef SERIAL_DBG
+        Serial.print(val);
+        Serial.print(",");
+    #endif
 }
 
 void printValues() {
 
     display.setTextSize(1);
     display.setCursor(0, 0);
-    
+
     printLine<float>(" Temp[C] = ",       bme.readTemperature());
     printLine<float>(" Pre[hPa] = ",      bme.readPressure() / 100.0F);
     printLine<float>(" Alt[m] = ",        bme.readAltitude(SEALEVELPRESSURE_HPA));
     printLine<float>(" Hum[%] = ",        bme.readHumidity());
 
-    // printLine<uint8_t>(" AQI[-] = ",      ens.getAQI());
-    // printLine<uint16_t>(" TVOC[ppb] = ",  ens.getTVOC());
-    // printLine<uint16_t>(" ECO2[ppb] = ",  ens.getECO2());
+    printLine<uint8_t>(" AQI[-] = ",      ens.getAQI());
+    printLine<uint16_t>(" TVOC[ppb] = ",  ens.getTVOC());
+    printLine<uint16_t>(" ECO2[ppb] = ",  ens.getECO2());
+
+    #ifdef SERIAL_DBG
+        Serial.println();
+    #endif
 
     display.display();
 }

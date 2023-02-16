@@ -30,6 +30,7 @@
 #include <DFRobot_ENS160.h>
 #include <SPIMemory.h>
 #include <SPI.h>
+#include <DFRobot_DS1307.h>
 
 #define SERIAL_DBG 1
 
@@ -53,58 +54,76 @@ Adafruit_BME280 bme; // I2C
 #define MEM_CS 10
 #define MEM_BUF_LENGTH 100
 
+DFRobot_DS1307 rtcClk;
+
 unsigned long delayTime;
 
 void setup() {
     
+    uint8_t timeoutCount = 0;
+
+    Serial.begin(9600);
+    while(!Serial && timeoutCount <= 5) {
+        delay(500);
+        timeoutCount++;
+    }
+    
+    while(!rtcClk.begin() && timeoutCount <= 5) {
+        #ifdef SERIAL_DGB
+            Serial.print("Could not find a valid DS1307 RTC, attempt no: ");
+            Serial.println(timeoutCount + 1);
+        #endif
+        delay(500);
+        timeoutCount++;
+    }
+    
     SPI.begin();
     SPI.beginTransaction(SPISettings(20000, MSBFIRST, SPI_MODE0));
     pinMode(MEM_CS, OUTPUT);
-    Serial.begin(9600);
-    while(!Serial);    // time to get serial running
-        // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
-    if(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS)) {
-    #ifdef SERIAL_DBG    
-        Serial.println(F("SSD1306 allocation failed"));
-    #endif
-    for(;;); // Don't proceed, loop forever
-    }
-    // Show initial display buffer contents on the screen --
-    // the library initializes this with an Adafruit splash screen.
-    display.display();
-    delay(2000); // Pause for 2 seconds
 
-    // Clear the buffer
+    timeoutCount = 0;
+    while(!display.begin(SSD1306_SWITCHCAPVCC, SCREEN_ADDRESS) && timeoutCount <= 5) {
+        #ifdef SERIAL_DBG    
+            Serial.print("SSD1306 allocation failed, attempt no");
+            Serial.println(timeoutCount + 1);
+        #endif
+        delay(500);
+        timeoutCount++;
+    }
+    display.display();
+    delay(1000);
+
     display.clearDisplay();
 
     
-    // default settings
-    //status = bme.begin();  
-    // You can also pass in a Wire library object like &Wire2
-
-    uint8_t timeoutNo = 3;
-
-    if (!bme.begin(0x76, &Wire)) {
+    timeoutCount = 0;
+    while(!bme.begin(0x76, &Wire) && timeoutCount <= 5) {
         #ifdef SERIAL_DGB
-            Serial.println("Could not find a valid BME280 sensor, check wiring, address, sensor ID!");
-            Serial.print("SensorID was: 0x"); Serial.println(bme.sensorID(),16);
+            Serial.print("Could not find a valid BME280 sensor, attempt no: ");
+            Serial.println(timeoutCount + 1);
         #endif
-        while (timeoutNo--) delay(10);
-    }
-
-    timeoutNo = 3;
-
-    if(ens.begin() != NO_ERR) {
-        #ifdef SERIAL_DGB
-            Serial.println("Communication with ENS160 failed, chcek connections and power");
-        #endif
-        while (timeoutNo--) delay(10);
+        delay(500);
+        timeoutCount++;
     }
 
     String bmeStat(bme.sensorID(), DEC);
+    #ifdef SERIAL_DBG
+        Serial.println("BME status: " + bmeStat);
+    #endif
+
+    timeoutCount = 0;
+    while(!ens.begin() != NO_ERR && timeoutCount <= 5) {
+        #ifdef SERIAL_DGB
+            Serial.print("Communication with ENS160 failed, attempt no: ");
+            Serial.println(timeoutCount + 1w);
+        #endif
+        delay(500);
+        timeoutCount++;
+    }
+
     String ensStat(ens.getENS160Status(), DEC);
     #ifdef SERIAL_DBG
-        Serial.println("BME status: " + bmeStat + " ENS status " + ensStat + ".");
+        Serial.println(" ENS status " + ensStat);
     #endif
     ens.setPWRMode(ENS160_STANDARD_MODE);
     ens.setTempAndHum(bme.readTemperature(), bme.readHumidity());

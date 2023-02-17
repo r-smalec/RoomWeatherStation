@@ -33,12 +33,10 @@
 #include <DFRobot_DS1307.h>
 
 #define SERIAL_DBG 1
+template <class T> void printLine(String txt, T val);
+void printValues(void);
 
-#define ENS_SCK 13
-#define ENS_MISO 12
-#define ENS_MOSI 11
-#define ENS_CS 9
-DFRobot_ENS160_I2C ens(&Wire, 0x53);
+DFRobot_DS1307 rtcClk;
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 64 // OLED display height, in pixels
@@ -47,14 +45,17 @@ DFRobot_ENS160_I2C ens(&Wire, 0x53);
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
 #define SEALEVELPRESSURE_HPA (1013.25)
-void printValues(void);
-
 Adafruit_BME280 bme; // I2C
+
+#define ENS_SCK 13
+#define ENS_MISO 12
+#define ENS_MOSI 11
+#define ENS_CS 9
+DFRobot_ENS160_I2C ens(&Wire, 0x53);
 
 #define MEM_CS 10
 #define MEM_BUF_LENGTH 100
 
-DFRobot_DS1307 rtcClk;
 
 unsigned long delayTime;
 
@@ -76,7 +77,10 @@ void setup() {
         delay(500);
         timeoutCount++;
     }
-    
+    uint16_t setTimeBuff[7] = {5, 1, 7, 6, 17, 2, 2023};
+    rtcClk.setTime(setTimeBuff);
+    rtcClk.start();
+
     SPI.begin();
     SPI.beginTransaction(SPISettings(20000, MSBFIRST, SPI_MODE0));
     pinMode(MEM_CS, OUTPUT);
@@ -90,8 +94,6 @@ void setup() {
         delay(500);
         timeoutCount++;
     }
-    display.display();
-    delay(1000);
 
     display.clearDisplay();
 
@@ -123,7 +125,7 @@ void setup() {
 
     String ensStat(ens.getENS160Status(), DEC);
     #ifdef SERIAL_DBG
-        Serial.println(" ENS status " + ensStat);
+        Serial.println("ENS status: " + ensStat);
     #endif
     ens.setPWRMode(ENS160_STANDARD_MODE);
     ens.setTempAndHum(bme.readTemperature(), bme.readHumidity());
@@ -158,6 +160,7 @@ void loop() {
 
     printValues();
     delay(delayTime);
+
 }
 
 template <class T> void printLine(String txt, T val) {
@@ -179,9 +182,19 @@ template <class T> void printLine(String txt, T val) {
 
 void printValues() {
 
+    uint16_t getTimeBuff[7] = {0};
+    rtcClk.getTime(getTimeBuff);
+    char currTime[20];
+    char currDate[20];
+    sprintf(currDate, " %d/%d/%d ", getTimeBuff[6], getTimeBuff[5], getTimeBuff[4]);
+    sprintf(currTime, "%d:%d:%d", getTimeBuff[2], getTimeBuff[1], getTimeBuff[0]);
+    String currDate_s(currDate);
+    String currTime_s(currTime);
+
     display.setTextSize(1);
     display.setCursor(0, 0);
 
+    printLine<String>(currDate_s,         currTime_s);
     printLine<float>(" Temp[C] = ",       bme.readTemperature());
     printLine<float>(" Pre[hPa] = ",      bme.readPressure() / 100.0F);
     printLine<float>(" Alt[m] = ",        bme.readAltitude(SEALEVELPRESSURE_HPA));

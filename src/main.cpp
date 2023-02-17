@@ -32,7 +32,8 @@
 #include <SPI.h>
 #include <DFRobot_DS1307.h>
 
-#define SERIAL_DBG 1
+//#define SERIAL_DBG
+#define SERIAL_THRHLD
 template <class T> void printLine(String txt, T val);
 void printValues(void);
 
@@ -56,8 +57,9 @@ DFRobot_ENS160_I2C ens(&Wire, 0x53);
 #define MEM_CS 10
 #define MEM_BUF_LENGTH 100
 
-
 unsigned long delayTime;
+uint8_t actualAQI;
+bool changeAQI;
 
 void setup() {
     
@@ -77,7 +79,7 @@ void setup() {
         delay(500);
         timeoutCount++;
     }
-    uint16_t setTimeBuff[7] = {5, 1, 7, 6, 17, 2, 2023};
+    uint16_t setTimeBuff[7] = {10, 27, 2, 5, 17, 2, 2023};
     rtcClk.setTime(setTimeBuff);
     rtcClk.start();
 
@@ -151,6 +153,8 @@ void setup() {
         Serial.println(memCap_str);
     #endif
 
+    actualAQI = ens.getAQI();
+    changeAQI = true;
     delayTime = 500;
     Serial.println();
 }
@@ -161,6 +165,13 @@ void loop() {
     printValues();
     delay(delayTime);
 
+    #ifdef SERIAL_THRHLD
+        if(actualAQI != ens.getAQI()) {
+            actualAQI = ens.getAQI();
+            changeAQI = true;
+            Serial.println();
+        }
+    #endif
 }
 
 template <class T> void printLine(String txt, T val) {
@@ -177,6 +188,13 @@ template <class T> void printLine(String txt, T val) {
     #ifdef SERIAL_DBG
         Serial.print(val);
         Serial.print(",");
+    #endif
+
+    #ifdef SERIAL_THRHLD
+        if(changeAQI) {
+            Serial.print(txt);
+            Serial.println(val);
+        }
     #endif
 }
 
@@ -206,6 +224,10 @@ void printValues() {
 
     #ifdef SERIAL_DBG
         Serial.println();
+    #endif
+
+    #ifdef SERIAL_THRHLD
+        changeAQI = false;
     #endif
 
     display.display();

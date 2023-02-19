@@ -36,7 +36,10 @@
 #define SERIAL_THRHLD
 template <class T> void printLine(String txt, T val);
 void printValues(void);
+bool confTerminal(void);
 
+const int cmdMaxSize = 15;
+    
 DFRobot_DS1307 rtcClk;
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -79,7 +82,17 @@ void setup() {
         delay(500);
         timeoutCount++;
     }
-    uint16_t setTimeBuff[7] = {10, 27, 2, 5, 17, 2, 2023};
+
+    Serial.println("Press any key to access configuration termianl or application will start");
+    for(int bootCount = 3; bootCount > 0; bootCount--) {
+        Serial.println(bootCount);
+        delay(1000);
+        if(Serial.available()) {
+            confTerminal();
+            break;
+        }
+    }
+    uint16_t setTimeBuff[7] = {20, 26, 15, 5, 17, 2, 2023};
     rtcClk.setTime(setTimeBuff);
     rtcClk.start();
 
@@ -176,7 +189,7 @@ void loop() {
 
 template <class T> void printLine(String txt, T val) {
 
-    const int16_t curX = 85;
+    const int16_t curX = 80;
 
     display.setTextColor(SSD1306_BLACK, SSD1306_WHITE);
     display.print(txt);
@@ -213,14 +226,14 @@ void printValues() {
     display.setCursor(0, 0);
 
     printLine<String>(currDate_s,         currTime_s);
-    printLine<float>(" Temp[C] = ",       bme.readTemperature());
-    printLine<float>(" Pre[hPa] = ",      bme.readPressure() / 100.0F);
-    printLine<float>(" Alt[m] = ",        bme.readAltitude(SEALEVELPRESSURE_HPA));
-    printLine<float>(" Hum[%] = ",        bme.readHumidity());
+    printLine<float>(" Temp[C]: ",       bme.readTemperature());
+    printLine<float>(" Pre[hPa]: ",      bme.readPressure() / 100.0F);
+    printLine<float>(" Alt[m]: ",        bme.readAltitude(SEALEVELPRESSURE_HPA));
+    printLine<float>(" Hum[%]: ",        bme.readHumidity());
 
-    printLine<uint8_t>(" AQI[-] = ",      ens.getAQI());
-    printLine<uint16_t>(" TVOC[ppb] = ",  ens.getTVOC());
-    printLine<uint16_t>(" ECO2[ppb] = ",  ens.getECO2());
+    printLine<uint8_t>(" AQI[-]: ",      ens.getAQI());
+    printLine<uint16_t>(" TVOC[ppb]: ",  ens.getTVOC());
+    printLine<uint16_t>(" ECO2[ppb]: ",  ens.getECO2());
 
     #ifdef SERIAL_DBG
         Serial.println();
@@ -231,4 +244,34 @@ void printValues() {
     #endif
 
     display.display();
+}
+
+typedef enum {
+    HELP,
+    QUIT,
+    CMD_COUNT
+} cmd_names;
+
+std::array<String, CMD_COUNT> cmdList = {"Help", "Quit"};
+
+void printAllCmds(void) {
+    for(uint8_t cmdName = 0; cmdName < (uint8_t)cmd_names::CMD_COUNT; cmdName++) {
+        Serial.println(cmdList[cmdName]);
+    }
+}
+
+bool confTerminal(void) {
+    Serial.println("Welcome in terminal Type 'help' to list commands or 'quit' to discard terminal");
+    char cmd[cmdMaxSize];
+    while(!Serial.available());
+    strncpy(cmd, Serial.readString().c_str(), sizeof(Serial.readString().c_str())>cmdMaxSize? sizeof(Serial.readString().c_str()) : cmdMaxSize);
+
+    if(strstr(cmd, "help") != NULL) {
+        printAllCmds();
+        return 0;
+    }
+    else if(strstr(cmd, "quit"))
+        return 0;
+    else
+        return 1;
 }

@@ -263,7 +263,7 @@ void printAllCmds(void) {
     }
 }
 
-bool confTerminal(void) {
+bool confTerminal() {
     Serial.println("Welcome in terminal Type 'help' to list commands or 'quit' to discard terminal");
     char cmd[cmdMaxSize];
     while(!Serial.available());

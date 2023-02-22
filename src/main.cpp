@@ -32,8 +32,8 @@
 #include <SPI.h>
 #include <DFRobot_DS1307.h>
 
-//#define SERIAL_DBG
-#define SERIAL_THRHLD
+#define SERIAL_DBG
+//#define SERIAL_THRHLD
 template <class T> void printLine(String txt, T val);
 void printValues(void);
 bool confTerminal(void);
@@ -75,26 +75,18 @@ void setup() {
     }
     
     while(!rtcClk.begin() && timeoutCount <= 5) {
-        #ifdef SERIAL_DGB
+        #ifdef SERIAL_DBG
             Serial.print("Could not find a valid DS1307 RTC, attempt no: ");
             Serial.println(timeoutCount + 1);
         #endif
         delay(500);
         timeoutCount++;
     }
-
-    Serial.println("Press any key to access configuration termianl or application will start");
-    for(int bootCount = 3; bootCount > 0; bootCount--) {
-        Serial.println(bootCount);
-        delay(1000);
-        if(Serial.available()) {
-            confTerminal();
-            break;
-        }
-    }
-    uint16_t setTimeBuff[7] = {20, 26, 15, 5, 17, 2, 2023};
+    //SEC-MIN-HOUR DAY-MONTH-YEAR
+    uint16_t setTimeBuff[7] = {22, 21, 19, 5, 20, 2, 2023};
     rtcClk.setTime(setTimeBuff);
     rtcClk.start();
+    rtcClk.setSqwPinMode(rtcClk.eSquareWave_1Hz);
 
     SPI.begin();
     SPI.beginTransaction(SPISettings(20000, MSBFIRST, SPI_MODE0));
@@ -115,7 +107,7 @@ void setup() {
     
     timeoutCount = 0;
     while(!bme.begin(0x76, &Wire) && timeoutCount <= 5) {
-        #ifdef SERIAL_DGB
+        #ifdef SERIAL_DBG
             Serial.print("Could not find a valid BME280 sensor, attempt no: ");
             Serial.println(timeoutCount + 1);
         #endif
@@ -129,10 +121,10 @@ void setup() {
     #endif
 
     timeoutCount = 0;
-    while(!ens.begin() != NO_ERR && timeoutCount <= 5) {
-        #ifdef SERIAL_DGB
+    while(!ens.begin() == NO_ERR && timeoutCount <= 5) {
+        #ifdef SERIAL_DBG
             Serial.print("Communication with ENS160 failed, attempt no: ");
-            Serial.println(timeoutCount + 1w);
+            Serial.println(timeoutCount + 1);
         #endif
         delay(500);
         timeoutCount++;
@@ -142,9 +134,20 @@ void setup() {
     #ifdef SERIAL_DBG
         Serial.println("ENS status: " + ensStat);
     #endif
+
+    Serial.println("Press any key to access configuration termianl or application will start");
+    for(int bootCount = 3; bootCount > 0; bootCount--) {
+        Serial.println(bootCount);
+        delay(1000);
+        if(Serial.available()) {
+            confTerminal();
+            break;
+        }
+    }
+    
     ens.setPWRMode(ENS160_STANDARD_MODE);
     ens.setTempAndHum(bme.readTemperature(), bme.readHumidity());
-    
+
     digitalWrite(MEM_CS, LOW);
     uint8_t manufacturerID = 0x00;
     uint8_t memType = 0x00;
@@ -225,7 +228,7 @@ void printValues() {
     display.setTextSize(1);
     display.setCursor(0, 0);
 
-    printLine<String>(currDate_s,         currTime_s);
+    printLine<String>(currDate_s,        currTime_s);
     printLine<float>(" Temp[C]: ",       bme.readTemperature());
     printLine<float>(" Pre[hPa]: ",      bme.readPressure() / 100.0F);
     printLine<float>(" Alt[m]: ",        bme.readAltitude(SEALEVELPRESSURE_HPA));
@@ -264,7 +267,7 @@ bool confTerminal(void) {
     Serial.println("Welcome in terminal Type 'help' to list commands or 'quit' to discard terminal");
     char cmd[cmdMaxSize];
     while(!Serial.available());
-    strncpy(cmd, Serial.readString().c_str(), sizeof(Serial.readString().c_str())>cmdMaxSize? sizeof(Serial.readString().c_str()) : cmdMaxSize);
+    strncpy(cmd, Serial.readStringUntil('\n').c_str(), sizeof(Serial.readString().c_str())>cmdMaxSize? sizeof(Serial.readString().c_str()) : cmdMaxSize);
 
     if(strstr(cmd, "help") != NULL) {
         printAllCmds();

@@ -83,7 +83,7 @@ void setup() {
         timeoutCount++;
     }
     //SEC-MIN-HOUR DAY-MONTH-YEAR
-    uint16_t setTimeBuff[7] = {22, 21, 19, 5, 20, 2, 2023};
+    uint16_t setTimeBuff[7] = {0, 0, 0, 5, 1, 1, 2023};
     rtcClk.setTime(setTimeBuff);
     rtcClk.start();
     rtcClk.setSqwPinMode(rtcClk.eSquareWave_1Hz);
@@ -221,7 +221,7 @@ void printValues() {
     char currTime[20];
     char currDate[20];
     sprintf(currDate, " %d/%d/%d ", getTimeBuff[6], getTimeBuff[5], getTimeBuff[4]);
-    sprintf(currTime, "%d:%d:%d", getTimeBuff[2], getTimeBuff[1], getTimeBuff[0]);
+    sprintf(currTime, "%02d:%02d:%02d", getTimeBuff[2], getTimeBuff[1], getTimeBuff[0]);
     String currDate_s(currDate);
     String currTime_s(currTime);
 
